@@ -1,104 +1,75 @@
 package pl.krzysztofwilk.rpn;
 
-import java.io.PrintStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import pl.krzysztofwilk.rpn.operator.Operator;
+import pl.krzysztofwilk.rpn.operator.OperatorFactoryImpl;
+import pl.krzysztofwilk.rpn.operator.OperatorSymbol;
+import pl.krzysztofwilk.rpn.output.Output;
+import pl.krzysztofwilk.rpn.output.OutputFactoryImpl;
+
 import java.math.BigDecimal;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.StringTokenizer;
+import java.util.List;
 
 public class RpnParser {
 
-    private String getExpression(String[] args) {
-        if (args.length < 1) {
-            throw new IllegalArgumentException("Missing RPN expression");
-        }
+    public static final Logger LOG = LoggerFactory.getLogger(RpnParser.class);
 
-        return args[0];
-    }
+    private Output output;
 
-    private BigDecimal calculateExact(String expression) {
-        StringTokenizer st = new StringTokenizer(expression, " ");
-        Deque<BigDecimal> stack = new ArrayDeque<>();
+    @SuppressWarnings("squid:S1068")
+    private static final String DEFAULT_OUTPUT  = "console";
 
-        while (st.hasMoreTokens()) {
-            String token = st.nextToken().trim();
-
-            if (token.matches("^[-+]?[\\d]*\\.?[\\d]+$")) {
-                stack.push(new BigDecimal(token));
-            } else if (token.matches("^[+\\-]$")) {
-                BigDecimal a = stack.pop();
-                BigDecimal b = stack.pop();
-
-                switch (token) {
-                    case "+":
-                        stack.push(b.add(a));
-                        break;
-                    case "-":
-                        stack.push(b.subtract(a));
-                        break;
-//                    case "*":
-//                        stack.push(b.multiply(a));
-//                        break;
-//                    case "/":
-//                        stack.push(b.divide(a));
-//                        break;
-                    default:
-                        break; // Should not reach here
-                }
-            } else {
-                throw new IllegalStateException("Illegal token: '" + token + "'");
-            }
-        }
-        return stack.pop();
-    }
-
-    int calculate(String expression) {
-        StringTokenizer st = new StringTokenizer(expression, " ");
-        Deque<Integer> stack = new ArrayDeque<>();
-
-        while (st.hasMoreTokens()) {
-            String token = st.nextToken().trim();
-
-            if (token.matches("^\\d+$")) {
-                stack.push(Integer.valueOf(token));
-            } else if (token.matches("^[+\\-*/]$")) {
-                Integer a = stack.pop();
-                Integer b = stack.pop();
-
-                switch (token) {
-                    case "+":
-                        stack.push(b + a);
-                        break;
-                    case "-":
-                        stack.push(b - a);
-                        break;
-                    case "*":
-                        stack.push(b * a);
-                        break;
-                    case "/":
-                        stack.push(b / a);
-                        break;
-                    default:
-                        break; // Should not reach here
-                }
-            } else {
-                throw new IllegalStateException("Illegal token: '" + token + "'");
-            }
-        }
-        return stack.pop();
-    }
-
-    private void printResult(String expression, BigDecimal result, PrintStream outputStream) {
-        outputStream.println(expression + " = " + result);
-    }
+    @SuppressWarnings("squid:S1068")
+    private static final String TMP_OUTPUT = "file:target/output.log";
 
     public static void main(String[] args) {
         RpnParser parser = new RpnParser();
 
-        String expression = parser.getExpression(args);
+        OutputFactoryImpl outputFactory = new OutputFactoryImpl();
 
-        BigDecimal result = parser.calculateExact(expression);
+        parser.output = outputFactory.makeOutput(TMP_OUTPUT);
 
-        parser.printResult(expression, result, System.out);
+        BigDecimal result = parser.calculate(args);
+
+        parser.printResult(args, result);
+    }
+
+    BigDecimal calculate(String[] expression) {
+        Deque<BigDecimal> stack = new ArrayDeque<>();
+
+        int tokenNo = 0;
+
+        OperatorFactoryImpl operatorFactory = new OperatorFactoryImpl();
+
+        List<String> symbols = OperatorSymbol.symbols();
+
+        while (tokenNo < expression.length) {
+            String token = expression[tokenNo].trim();
+            tokenNo++;
+
+            if (isNumber(token)) {
+                stack.push(new BigDecimal(token));
+            } else if (symbols.contains(token)) {
+                BigDecimal a = stack.pop();
+                BigDecimal b = stack.pop();
+
+                Operator operator = operatorFactory.makeOperator(token);
+                operator.apply(a, b, stack);
+            } else {
+                throw new IllegalArgumentException("Illegal token: '" + token + "'");
+            }
+        }
+        return stack.pop();
+    }
+
+    private boolean isNumber(String token) {
+        return token.matches("^[-+]?[\\d]*\\.?[\\d]+$");
+    }
+
+    private void printResult(String[] expression, BigDecimal result) {
+        output.display(expression, result);
     }
 }

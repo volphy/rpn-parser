@@ -7,6 +7,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -20,17 +21,17 @@ public class RpnParserTest {
     @Parameters(name = "{index}: rpn({0})={1} exception={2}")
     public static Collection<Object[]> data() {
         return Arrays.asList(new Object[][]{
-                {"5 1 2 + 4 * + 3 -", 14, false},
-                {"5 1 2 + 4 x + 3 -", -1, true}
+                {new String[]{"5", "1", "2", "+", "4", "*", "+", "3", "-"}, BigDecimal.valueOf(14L), false},
+                {new String[]{"5", "1", "2", "+", "4", "x", "+", "3", "-"}, BigDecimal.valueOf(-1L), true}
         });
     }
 
-    private String expression;
-    private int expectedResult;
+    private String[] expression;
+    private BigDecimal expectedResult;
     private boolean exceptionExpected;
 
-    public RpnParserTest(String expression,
-                         int expectedResult,
+    public RpnParserTest(String[] expression,
+                         BigDecimal expectedResult,
                          boolean exceptionExpected) {
         this.expression = expression;
         this.expectedResult = expectedResult;
@@ -45,10 +46,10 @@ public class RpnParserTest {
         RpnParser parser = new RpnParser();
 
         if (exceptionExpected) {
-            thrown.expect(IllegalStateException.class);
+            thrown.expect(IllegalArgumentException.class);
         }
 
-        int result = parser.calculate(expression);
+        BigDecimal result = parser.calculate(expression);
 
         assertEquals(expectedResult, result);
     }
